@@ -8,6 +8,12 @@ from pydantic import BaseModel, Field
 
 from auth import AuthHeader, require_user, require_writer
 from db import connect, write_audit
+from formal_source import (
+    ambiguous_seats_by_slot,
+    begin_read,
+    formal_seats_by_slot,
+    same_source,
+)
 from locks import release, require_lock
 
 router = APIRouter(tags=["slots"])
@@ -25,24 +31,43 @@ class CloseIn(BaseModel):
     code: str
 
 
+def _slot_view(row, formal: dict, ambiguous: dict) -> dict:
+    item = dict(row)
+    f = formal.get(int(row["id"]), 0)
+    a = ambiguous.get(int(row["id"]), 0)
+    item["formal_seats"] = f
+    item["ambiguous_seats"] = a
+    item["split"] = a > 0 or f != int(row["booked"])
+    return item
+
+
 @router.get("/api/slots")
 def list_slots(authorization: AuthHeader = None):
     require_user(authorization)
     with connect() as conn:
+        begin_read(conn)
         rows = conn.execute(
             "SELECT * FROM slots ORDER BY start_at, code"
         ).fetchall()
-        return {"items": [dict(r) for r in rows]}
+        formal = formal_seats_by_slot(conn)
+        ambiguous = ambiguous_seats_by_slot(conn)
+        return {
+            "items": [_slot_view(r, formal, ambiguous) for r in rows],
+            "same_source": same_source(conn),
+        }
 
 
 @router.get("/api/slots/{code}")
 def get_slot(code: str, authorization: AuthHeader = None):
     require_user(authorization)
     with connect() as conn:
+        begin_read(conn)
         row = conn.execute("SELECT * FROM slots WHERE code=?", (code,)).fetchone()
         if not row:
             raise HTTPException(404, "档期不存在")
-        return dict(row)
+        return _slot_view(
+            row, formal_seats_by_slot(conn), ambiguous_seats_by_slot(conn)
+        )
 
 
 @router.post("/api/slots")
@@ -105,6 +130,8 @@ def close_slot(body: CloseIn, authorization: AuthHeader = None):
 def dashboard(authorization: AuthHeader = None):
     require_user(authorization)
     with connect() as conn:
+        begin_read(conn)
+        report = same_source(conn)
         return {
             "slots_open": conn.execute(
                 "SELECT COUNT(*) c FROM slots WHERE status='开放'"
@@ -112,9 +139,10 @@ def dashboard(authorization: AuthHeader = None):
             "holds_open": conn.execute(
                 "SELECT COUNT(*) c FROM holds WHERE status='占位中'"
             ).fetchone()["c"],
-            "bookings": conn.execute(
-                "SELECT COUNT(*) c FROM bookings WHERE status='已确认'"
-            ).fetchone()["c"],
+            "bookings": report["formal_count"],
+            "ambiguous_bookings": report["ambiguous_count"],
+            "orphan_bookings": report["orphan_count"],
+            "same_source_ok": report["ok"],
             "waitlist": conn.execute(
                 "SELECT COUNT(*) c FROM waitlist WHERE status='候补中'"
             ).fetchone()["c"],

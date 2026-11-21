@@ -24,6 +24,10 @@ createApp({
     const bookings = ref([]);
     const recon = ref({});
     const audits = ref([]);
+    const auditSameSource = ref(null);
+    const bookingsSameSource = ref(null);
+    const proof = ref({});
+    const proofKey = ref("");
     const contention = ref([]);
     const dash = ref({});
     const holdForm = ref({ slot_code: "S-AM-01", party_key: "P-NEW", seats: 1 });
@@ -60,10 +64,24 @@ createApp({
       slots.value = (await api.get("/api/slots")).items;
       holds.value = (await api.get("/api/holds")).items;
       waitlist.value = (await api.get("/api/waitlist")).items;
-      bookings.value = (await api.get("/api/bookings")).items;
+      const bk = await api.get("/api/bookings");
+      bookings.value = bk.items;
+      bookingsSameSource.value = bk.same_source || null;
       recon.value = await api.get("/api/reconcile");
-      audits.value = (await api.get("/api/audit")).items;
+      const au = await api.get("/api/audit");
+      audits.value = au.items;
+      auditSameSource.value = au.same_source || null;
       contention.value = (await api.get("/api/contention")).items;
+    }
+
+    async function loadProof() {
+      if (!proofKey.value) return;
+      try {
+        actionErr.value = "";
+        proof.value = await api.get("/api/proof/" + encodeURIComponent(proofKey.value));
+      } catch (e) {
+        actionErr.value = e.message;
+      }
     }
 
     async function doHold() {
@@ -84,6 +102,7 @@ createApp({
     return {
       token, user, username, password, err, actionErr, tab, nav,
       slots, holds, waitlist, bookings, recon, audits, contention, dash,
+      auditSameSource, bookingsSameSource, proof, proofKey, loadProof,
       holdForm, confirmId, login, logout, refresh, doHold, doConfirm, promoteWait,
     };
   },

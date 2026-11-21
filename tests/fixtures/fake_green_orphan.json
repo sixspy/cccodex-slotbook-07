@@ -1,0 +1,14 @@
+{
+  "note": "互证有行 / 正式册无行的假绿夹具：已确认正式行指向不存在的档期（无主行）。互证直接查 bookings 会把它当正式席；正式册 INNER JOIN slots 查无；对账按 slots 遍历时不计它，仍打勾。",
+  "bookings": [
+    {
+      "slot_id": 990001,
+      "hold_id": null,
+      "party_key": "P-GHOST",
+      "seats": 2,
+      "snapshot_gen": 1,
+      "status": "已确认",
+      "created_at": "2026-11-21T09:00:00"
+    }
+  ]
+}

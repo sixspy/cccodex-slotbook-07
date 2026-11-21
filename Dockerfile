@@ -6,6 +6,7 @@ COPY backend/ ./backend/
 COPY frontend/ ./frontend/
 COPY fixtures/ ./fixtures/
 COPY tests/ ./tests/
+COPY docs/ ./docs/
 COPY pytest.ini .
 RUN mkdir -p /app/data
 ENV PYTHONUNBUFFERED=1

@@ -34,6 +34,8 @@ def try_acquire(conn, lock_key: str, holder: str) -> bool:
            VALUES (?,?,?,?,?)""",
         (lock_key, holder, "争用", f"持有者={row['holder']}", now),
     )
+    # 争用痕必须活过后到者的业务回滚：此处立即落盘。
+    conn.commit()
     return False
 
 
